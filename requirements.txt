@@ -1,0 +1,35 @@
+# Core
+numpy
+pandas
+tqdm
+matplotlib
+pillow
+
+# Image I/O + processing (needed for alignment + embedding pipeline)
+opencv-python
+
+# Torch stack (pin versions that are compatible with facenet-pytorch)
+torch==2.2.2
+torchvision==0.17.2
+torchaudio==2.2.2
+pytorch-lightning==2.2.5
+
+# MTCNN alignment
+facenet-pytorch==2.6.0
+opencv-python-headless
+
+# SelfAge runtime deps (commonly needed)
+accelerate
+diffusers
+transformers
+safetensors
+huggingface-hub
+
+# AdaFace eval (model loading + preprocessing)
+# (AdaFace itself is usually a git repo, not a pip pkg, but these help)
+scikit-learn
+scipy
+
+# Optional but useful for notebooks / image handling
+ipython
+jupyter

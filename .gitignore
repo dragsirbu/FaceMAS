@@ -1,0 +1,55 @@
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+dist/
+build/
+*.so
+
+# ── Node / Next.js ──
+face-mas/node_modules/
+face-mas/.next/
+face-mas/out/
+face-mas/.pnp.*
+face-mas/.yarn/*
+
+# ── Environment files ──
+.env
+.env.*
+!.env.example
+
+# ── External dependencies (too large for git) ──
+OFIQ-Project/
+SelfAge/
+AdaFace/
+conda/
+miniconda.sh
+
+# ── Data & model weights ──
+data/
+outputs/
+*.ckpt
+*.safetensors
+*.bin
+*.npz
+*.pt
+*.pth
+*.onnx
+
+# ── Notebooks & evaluation (not part of the pipeline) ──
+*.ipynb
+Plots.ipynb
+
+# ── Archives ──
+*.zip
+
+# ── OS / IDE ──
+.DS_Store
+__MACOSX/
+.vscode/
+*.pem
+
+# ── Misc ──
+/tmp/
+*.log
