@@ -16,7 +16,7 @@ A face aging pipeline that takes reference photos of a person, trains a personal
 
 ## Requirements
 
-- **GPU**: NVIDIA GPU with CUDA support (tested on A40/A100, ~16 GB VRAM minimum)
+- **GPU**: NVIDIA GPU with CUDA support
 - **Python**: 3.10 or 3.11
 - **Node.js**: 18+ (for the frontend)
 - **Conda/Miniconda**: Required for the SelfAge environment
