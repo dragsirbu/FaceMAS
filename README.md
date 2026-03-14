@@ -1,4 +1,4 @@
-# FaceMAS — Facial Manipulation as a Service
+# FaceMAS - Facial Manipulation as a Service
 
 A face aging pipeline that takes reference photos of a person, trains a personalized LoRA model, and generates aged versions of a test photo using diffusion-based editing. Includes quality assessment (OFIQ), face search against AgeDB, and a web UI.
 
@@ -268,29 +268,3 @@ External dependencies (clone into root, not tracked in git):
 │   └── agedb_index.npz        # Pre-computed embeddings index
 └── conda/                     # Miniconda installation
 ```
-
----
-
-## RunPod / Cloud GPU Setup
-
-If running on RunPod or similar GPU cloud:
-
-1. Choose a template with **CUDA 11.8+** and **Python 3.10/3.11** (e.g., `runpod/pytorch:2.2.0-py3.10-cuda11.8.0-devel-ubuntu22.04`)
-2. Ensure at least **16 GB VRAM** (A40, A100, or RTX 4090)
-3. Expose **port 8000** (backend) and **port 3000** (frontend)
-4. Follow the setup instructions above inside the pod
-5. For the frontend, set `NEXT_PUBLIC_WORKER_URL` to the RunPod proxy URL for port 8000
-
----
-
-## Troubleshooting
-
-| Issue | Solution |
-|---|---|
-| `OFIQSampleApp: not found` | Build OFIQ or set `OFIQ_BIN` to the correct path |
-| `conda: command not found` | Install Miniconda and add to PATH |
-| `selfage` conda env not found | Run `conda create -n selfage python=3.10` and install deps |
-| CUDA out of memory | Reduce `SELFAGE_RESOLUTION` to 256 or `SELFAGE_MAX_TRAIN_STEPS` |
-| No faces detected | Ensure photos are well-lit, front-facing, with visible faces |
-| Frontend can't reach backend | Check `NEXT_PUBLIC_WORKER_URL` in `.env.local` matches backend address |
-| `agedb_index.npz` not found | Run `python -m worker.build_agedb_index` first |
