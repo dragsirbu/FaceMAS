@@ -2,25 +2,6 @@
 
 A face aging pipeline that takes reference photos of a person, trains a personalized LoRA model, and generates aged versions of a test photo using diffusion-based editing. Includes quality assessment (OFIQ), face search against AgeDB, and a web UI.
 
-```
-┌─────────────────────┐      HTTP / JSON       ┌────────────────────────┐
-│   Next.js Frontend  │ ◄────────────────────►  │   FastAPI Backend      │
-│   (face-mas/)       │                         │   (worker/)            │
-│                     │  POST /v1/pipeline      │                        │
-│                     │  POST /v1/quality-assess │  pipeline/             │
-│                     │  GET  /v1/jobs/{id}      │   detect_align.py      │
-│                     │  POST /v1/jobs/{id}/     │   ofiq.py              │
-│                     │       re-edit            │   selfage.py           │
-└─────────────────────┘                         │   face_search.py       │
-                                                └───────┬────────────────┘
-                                                        │
-                                    ┌───────────────────┼──────────────────┐
-                                    ▼                   ▼                  ▼
-                                 MTCNN            OFIQ Binary        SelfAge
-                               (detection)        (C++ / UQS)       (conda env)
-                                                                    SD 1.5 + LoRA
-```
-
 ## Pipeline Flow
 
 1. **Upload**: User uploads 3–5 reference photos + 1 test photo via the web UI
@@ -36,7 +17,6 @@ A face aging pipeline that takes reference photos of a person, trains a personal
 ## Requirements
 
 - **GPU**: NVIDIA GPU with CUDA support (tested on A40/A100, ~16 GB VRAM minimum)
-- **OS**: Linux (Ubuntu 20.04+ recommended)
 - **Python**: 3.10 or 3.11
 - **Node.js**: 18+ (for the frontend)
 - **Conda/Miniconda**: Required for the SelfAge environment
@@ -49,7 +29,7 @@ A face aging pipeline that takes reference photos of a person, trains a personal
 ### 1. Clone this repository
 
 ```bash
-git clone https://github.com/<your-username>/FaceMAS.git
+git clone https://github.com/dragsirbu/FaceMAS.git
 cd FaceMAS
 ```
 
