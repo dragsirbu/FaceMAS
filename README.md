@@ -16,11 +16,13 @@ A face aging pipeline that takes reference photos of a person, trains a personal
 
 ## Requirements
 
-- **GPU**: NVIDIA GPU with CUDA support
-- **Python**: 3.10 or 3.11
-- **Node.js**: 18+ (for the frontend)
-- **Conda/Miniconda**: Required for the SelfAge environment
-- **Disk space**: ~30 GB for all dependencies and model weights
+| Requirement | Details |
+|---|---|
+| **GPU** | NVIDIA GPU with CUDA support |
+| **Python** | 3.10 or 3.11 |
+| **Node.js** | 18+ (for the frontend) |
+| **Conda/Miniconda** | Required for the SelfAge environment |
+| **Disk space** | ~30 GB for all dependencies and model weights |
 
 ---
 
@@ -35,103 +37,96 @@ cd FaceMAS
 
 ### 2. Install external dependencies
 
-The pipeline depends on three external projects that are **not** included in this repo due to their size. Clone them into the workspace root:
+The pipeline depends on three external projects that are **not** included in this repo due to their size. Clone them into the workspace root.
+
+---
 
 #### 2a. OFIQ (Open Face Image Quality)
 
 OFIQ provides the C++ binary for face image quality assessment.
 
 ```bash
-# Clone and build OFIQ
 git clone https://github.com/BSI-OFIQ/OFIQ-Project.git
 cd OFIQ-Project
-
-# Build (requires CMake 3.16+, GCC 9+, and OpenCV dev libraries)
-# See OFIQ-Project/README.md for full build instructions
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j$(nproc)
-make install
-cd ../..
-
-# Verify the binary exists:
-ls OFIQ-Project/install_x86_64_linux/Release/bin/OFIQSampleApp
 ```
+
+Follow the [OFIQ build instructions](https://github.com/BSI-OFIQ/OFIQ-Project/blob/main/BUILD.md) to compile the project.
+
+---
 
 #### 2b. SelfAge (Personalized Age Editing)
 
 SelfAge provides the LoRA training and Prompt-to-Prompt age editing.
 
 ```bash
-# Clone the SelfAge repository
-git clone https://github.com/jonyzhang2023/SelfAge.git
+# Clone the SelfAge repository (from project root)
+git clone https://github.com/shiiiijp/SelfAge.git
 cd SelfAge
 
-# Create the conda environment
-conda create -n selfage python=3.10 -y
+# Create the conda environment and install all packages
+conda env create -f environment/selfage_env.yml
 conda activate selfage
-
-# Install SelfAge dependencies
-pip install -r requirements.txt
-
-# Download the regularization dataset (CelebA)
-# Place it at: SelfAge/data/CelebA_regularization_dex/
-# See SelfAge/README.md for download links
-
-conda deactivate
-cd ..
 ```
 
-**Important SelfAge modifications**: This pipeline requires three modifications to the upstream SelfAge code for attribute editing support. Apply them manually:
+Download the [VGG age classifier (DEX)](https://drive.google.com/file/d/1mE_EStue-f7yXGOzpl4qxM3vM270TnLc/view) and place it under `SelfAge/pretrained_model/`.
 
-1. **`SelfAge/scripts/age_editing.py`**: Add `--attributes` argument to `parse_args()`. When provided, append attributes to the target prompt (e.g., `"65-year-old smiling, receding hairline"`).
+Download the [regularization dataset](https://drive.google.com/file/d/1ldHHqVCPb46vZZKM_rhboxrHc0UtTukc/view) and place it under `SelfAge/data/`.
 
-2. **`SelfAge/utils/inference_utils.py`**: Change `is_replace_controller` from hardcoded `True` to:
-   ```python
-   is_replace_controller = len(inversion_prompt.split()) == len(new_prompt.split())
-   ```
-   This enables `AttentionRefine` for different-length prompts when attributes are added.
+> **Important: SelfAge code modifications**
+>
+> This pipeline requires three modifications to the upstream SelfAge code for attribute editing support. Apply them manually:
+>
+> 1. **`SelfAge/scripts/age_editing.py`**: Add an `--attributes` argument to `parse_args()`. When provided, append attributes to the target prompt (e.g., `"65-year-old smiling, receding hairline"`).
+>    ```python
+>    parser.add_argument('--attributes', default='', type=str,
+>                        help='Extra attributes to append to target prompt, e.g. "smiling, wearing glasses"')
+>    ```
+>
+> 2. **`SelfAge/utils/inference_utils.py`**: Change `is_replace_controller` from hardcoded `True` to:
+>    ```python
+>    is_replace_controller = len(inversion_prompt.split()) == len(new_prompt.split())
+>    ```
+>    This enables `AttentionRefine` for different-length prompts when attributes are added.
+>
+> 3. **`SelfAge/utils/seq_aligner.py`**: In `ScoreParams.mis_match_char()`, return `self.match` instead of `self` to fix a type error triggered by `AttentionRefine`.
 
-3. **`SelfAge/utils/seq_aligner.py`**: In `ScoreParams.mis_match_char()`, return `self.match` instead of `self` to fix a type error triggered by `AttentionRefine`.
+---
 
 #### 2c. AdaFace (Face Recognition)
 
 AdaFace provides face embeddings for the AgeDB face search feature.
 
 ```bash
-# Clone AdaFace
 git clone https://github.com/mk-minchul/AdaFace.git
 cd AdaFace
 
-# Download the pretrained checkpoint
 mkdir -p pretrained
-# Download adaface_ir50_ms1mv2.ckpt from the AdaFace releases
-# Place it at: AdaFace/pretrained/adaface_ir50_ms1mv2.ckpt
-# See AdaFace/README.md for download links
-
-cd ..
 ```
+
+Download [`adaface_ir50_ms1mv2.ckpt`](https://drive.google.com/file/d/1eUaSHG4pGlIZK7hBkqjyp2fc2epKoBvI/view) from AdaFace releases and place it at `AdaFace/pretrained/`.
+
+---
 
 #### 2d. AgeDB Dataset
 
-The face search feature uses AgeDB as the reference database.
+The face search feature uses AgeDB as the reference database. Download the dataset from [Kaggle](https://www.kaggle.com/datasets/nitingandhi/agedb-database?resource=download).
 
 ```bash
-# Create data directory
-mkdir -p data/AgeDB
-
-# Download AgeDB dataset images and place them in data/AgeDB/
-# Filenames follow the pattern: {id}_{CamelCaseName}_{age}_{gender}.jpg
-# e.g., 10000_GoldieHawn_62_f.jpg
+mkdir -p data
 ```
+
+Place the AgeDB folder containing the images under `data/`. Filenames follow the pattern:
+`{id}_{CamelCaseName}_{age}_{gender}.jpg`, e.g., `10000_GoldieHawn_62_f.jpg`
+
+---
 
 ### 3. Install backend (worker) dependencies
 
 ```bash
-# Install system-level Python dependencies
+# System-level Python dependencies
 pip install -r requirements.txt
 
-# Install worker-specific dependencies
+# Worker-specific dependencies
 pip install -r worker/requirements.txt
 ```
 
@@ -191,7 +186,7 @@ The frontend will be available at `http://localhost:3000`.
 
 ## Configuration
 
-All backend settings can be overridden via environment variables:
+### Backend (environment variables)
 
 | Variable | Default | Description |
 |---|---|---|
@@ -207,7 +202,7 @@ All backend settings can be overridden via environment variables:
 | `UQS_WARN` | `45` | OFIQ score threshold for "Low" |
 | `MAX_IMAGES` | `10` | Maximum images per request |
 
-Frontend configuration (in `face-mas/.env.local`):
+### Frontend (`face-mas/.env.local`)
 
 | Variable | Default | Description |
 |---|---|---|
@@ -258,7 +253,8 @@ FaceMAS/
 └── README.md
 ```
 
-External dependencies (clone into root, not tracked in git):
+### External dependencies (clone into root, not tracked in git)
+
 ```
 ├── OFIQ-Project/              # Face image quality assessment (C++)
 ├── SelfAge/                   # Age editing via diffusion models
