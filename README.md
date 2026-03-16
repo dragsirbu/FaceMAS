@@ -100,10 +100,10 @@ AdaFace provides face embeddings for the AgeDB face search feature.
 git clone https://github.com/mk-minchul/AdaFace.git
 cd AdaFace
 
-mkdir -p pretrained
+mkdir pretrained_model
 ```
 
-Download [`adaface_ir50_ms1mv2.ckpt`](https://drive.google.com/file/d/1eUaSHG4pGlIZK7hBkqjyp2fc2epKoBvI/view) from AdaFace releases and place it at `AdaFace/pretrained/`.
+Download [`adaface_ir50_ms1mv2.ckpt`](https://drive.google.com/file/d/1eUaSHG4pGlIZK7hBkqjyp2fc2epKoBvI/view) from AdaFace releases and place it at `AdaFace/pretrained_model/`.
 
 ---
 
