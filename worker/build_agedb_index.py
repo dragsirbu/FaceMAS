@@ -18,14 +18,16 @@ from PIL import Image
 from tqdm import tqdm
 
 # Make AdaFace importable
-sys.path.insert(0, "/workspace/AdaFace")
-sys.path.insert(0, "/workspace/AdaFace/face_alignment")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent  # FaceMAS/
+sys.path.insert(0, str(PROJECT_ROOT / "AdaFace"))
+sys.path.insert(0, str(PROJECT_ROOT / "AdaFace" / "face_alignment"))
+
 import net
 from mtcnn import MTCNN
 
-AGEDB_DIR = Path("/workspace/data/AgeDB")
-ADAFACE_CKPT = Path("/workspace/AdaFace/pretrained/adaface_ir50_ms1mv2.ckpt")
-OUT_PATH = Path("/workspace/data/agedb_index.npz")
+AGEDB_DIR = PROJECT_ROOT / "data" / "AgeDB"
+ADAFACE_CKPT = PROJECT_ROOT / "AdaFace" / "pretrained" / "adaface_ir50_ms1mv2.ckpt"
+OUT_PATH = PROJECT_ROOT / "data" / "agedb_index.npz"
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 64
@@ -41,7 +43,7 @@ T112 = np.array([
 
 def load_adaface():
     model = net.build_model("ir_50")
-    sd = torch.load(str(ADAFACE_CKPT), map_location="cpu")["state_dict"]
+    sd = torch.load(str(ADAFACE_CKPT), map_location="cpu", weights_only=False)["state_dict"]
     model_sd = {k[6:]: v for k, v in sd.items() if k.startswith("model.")}
     model.load_state_dict(model_sd)
     model.eval().to(DEVICE)

@@ -3,9 +3,11 @@ import os
 import numpy as np
 import cv2
 from PIL import Image
+from pathlib import Path
 
 # Make AdaFace MTCNN importable
-sys.path.insert(0, "/workspace/AdaFace/face_alignment")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent  # FaceMAS/
+sys.path.insert(0, str(PROJECT_ROOT / "AdaFace" / "face_alignment"))
 from mtcnn import MTCNN
 
 T112 = np.array([

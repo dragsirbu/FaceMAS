@@ -5,15 +5,16 @@ import torch
 from pathlib import Path
 from typing import List, Dict, Any
 
-sys.path.insert(0, "/workspace/AdaFace")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent  # FaceMAS/
+sys.path.insert(0, str(PROJECT_ROOT / "AdaFace"))
 import net
 
 from worker.pipeline.detect_align import detect_and_align
 from worker.pipeline.io import bgr_to_jpeg_b64
 
-AGEDB_DIR = Path("/workspace/data/AgeDB")
-ADAFACE_CKPT = Path("/workspace/AdaFace/pretrained/adaface_ir50_ms1mv2.ckpt")
-INDEX_PATH = Path("/workspace/data/agedb_index.npz")
+AGEDB_DIR = PROJECT_ROOT / "data" / "AgeDB"
+ADAFACE_CKPT = PROJECT_ROOT / "AdaFace" / "pretrained" / "adaface_ir50_ms1mv2.ckpt"
+INDEX_PATH = PROJECT_ROOT / "data" / "agedb_index.npz"
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -27,7 +28,7 @@ def _get_model():
     global _model
     if _model is None:
         m = net.build_model("ir_50")
-        sd = torch.load(str(ADAFACE_CKPT), map_location="cpu")["state_dict"]
+        sd = torch.load(str(ADAFACE_CKPT), map_location="cpu", weights_only=False)["state_dict"]
         m.load_state_dict({k[6:]: v for k, v in sd.items() if k.startswith("model.")})
         m.eval().to(DEVICE)
         _model = m

@@ -14,7 +14,9 @@ from worker.config import (
 )
 
 # If conda isn't on PATH in your service process, set this once
-CONDA_PREFIX_BIN = "/workspace/conda/condabin"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent  # FaceMAS/
+
+CONDA_PREFIX_BIN = str(PROJECT_ROOT / "conda" / "condabin")
 SELFAGE_CONDA_ENV = "selfage"
 
 def _env_with_pythonpath() -> dict:

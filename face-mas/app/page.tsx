@@ -27,6 +27,16 @@ type MatchItem = {
   base64: string;
 };
 
+type EditRun = {
+  targetAge: number;
+  gender: string;
+  attributes: string;
+  aged: AgedItem[];
+  testMatches: MatchItem[];
+  agedMatches: Record<string, MatchItem[]>;
+  searchErrors: string[];
+};
+
 export default function HomePage() {
   const refInputRef = useRef<HTMLInputElement | null>(null);
   const testInputRef = useRef<HTMLInputElement | null>(null);
@@ -34,9 +44,8 @@ export default function HomePage() {
   const [testPhoto, setTestPhoto] = useState<UploadItem | null>(null);
 
   const [qaResults, setQaResults] = useState<QAItem[] | null>(null);
-  const [aged, setAged] = useState<AgedItem[] | null>(null);
-  const [testMatches, setTestMatches] = useState<MatchItem[] | null>(null);
-  const [agedMatches, setAgedMatches] = useState<Record<string, MatchItem[]> | null>(null);
+  const [editHistory, setEditHistory] = useState<EditRun[]>([]);
+  const [selectedEditIdx, setSelectedEditIdx] = useState<number>(0);
   const [isAssessing, setIsAssessing] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +55,8 @@ export default function HomePage() {
   const [targetAge, setTargetAge] = useState<number>(50);
   const [gender, setGender] = useState<string>("");
   const [attributes, setAttributes] = useState<string>("");
+
+  const selectedEdit: EditRun | null = editHistory[selectedEditIdx] ?? null;
 
 
   const maxFiles = 5;
@@ -66,9 +77,8 @@ export default function HomePage() {
     if (next.length) {
       setItems((prev) => [...prev, ...next]);
       setQaResults(null);
-      setAged(null);
-      setTestMatches(null);
-      setAgedMatches(null);
+      setEditHistory([]);
+      setSelectedEditIdx(0);
       setError(null);
     }
   }
@@ -80,9 +90,8 @@ export default function HomePage() {
     if (testPhoto) URL.revokeObjectURL(testPhoto.previewUrl);
     setTestPhoto({ file: f, previewUrl: URL.createObjectURL(f) });
     setQaResults(null);
-    setAged(null);
-    setTestMatches(null);
-    setAgedMatches(null);
+    setEditHistory([]);
+    setSelectedEditIdx(0);
     setError(null);
   }
 
@@ -110,9 +119,8 @@ export default function HomePage() {
     setItems([]);
     setTestPhoto(null);
     setQaResults(null);
-    setAged(null);
-    setTestMatches(null);
-    setAgedMatches(null);
+    setEditHistory([]);
+    setSelectedEditIdx(0);
     setError(null);
   }
 
@@ -120,7 +128,6 @@ export default function HomePage() {
     if (items.length === 0) return;
     setError(null);
     setIsAssessing(true);
-    setAged(null);
     try {
       const refFiles = items.map((x) => x.file);
       const resp = await qualityAssess(refFiles, testPhoto?.file);
@@ -136,20 +143,22 @@ export default function HomePage() {
     if (!canRun) return;
     setError(null);
     setIsRunning(true);
-    setAged(null);
+    setEditHistory([]);
+    setSelectedEditIdx(0);
     setQaResults(null);
-    setTestMatches(null);
-    setAgedMatches(null);
 
     try {
       const refFiles = items.map((x) => x.file);
 
       // start -> job_id (test photo is always appended last)
-      const { job_id } = await startPipeline(refFiles, testPhoto!.file, targetAge, gender, attributes);
+      const editAge = targetAge;
+      const editGender = gender;
+      const editAttrs = attributes;
+      const { job_id } = await startPipeline(refFiles, testPhoto!.file, editAge, editGender, editAttrs);
       setJobId(job_id);
 
       // poll
-      await pollJob(job_id);
+      await pollJob(job_id, editAge, editGender, editAttrs);
     } catch (e: any) {
       setError(e?.message ?? "Pipeline failed");
     } finally {
@@ -161,13 +170,13 @@ export default function HomePage() {
     if (!jobId) return;
     setError(null);
     setIsRunning(true);
-    setAged(null);
-    setTestMatches(null);
-    setAgedMatches(null);
 
     try {
-      await reEdit(jobId, targetAge, gender, attributes);
-      await pollJob(jobId);
+      const editAge = targetAge;
+      const editGender = gender;
+      const editAttrs = attributes;
+      await reEdit(jobId, editAge, editGender, editAttrs);
+      await pollJob(jobId, editAge, editGender, editAttrs);
     } catch (e: any) {
       setError(e?.message ?? "Re-edit failed");
     } finally {
@@ -175,9 +184,22 @@ export default function HomePage() {
     }
   }
 
-  async function pollJob(job_id: string) {
+  async function pollJob(job_id: string, editAge: number, editGender: string, editAttrs: string) {
+    let failures = 0;
+    const MAX_FAILURES = 60; // give up after ~90s of consecutive failures
     while (true) {
-      const j = await getJob(job_id);
+      let j: any;
+      try {
+        j = await getJob(job_id);
+        failures = 0; // reset on success
+      } catch {
+        failures++;
+        if (failures >= MAX_FAILURES) {
+          throw new Error("Lost connection to server");
+        }
+        await new Promise((r) => setTimeout(r, 1500));
+        continue;
+      }
       const status = j.status ?? j?.job?.status;
       setJobStatus(status ?? "unknown");
       setJobMsg(j.message ?? "");
@@ -185,9 +207,20 @@ export default function HomePage() {
       if (j.results) setQaResults(j.results);
 
       if (status === "done") {
-        setAged(j.aged ?? null);
-        setTestMatches(j.test_matches ?? null);
-        setAgedMatches(j.aged_matches ?? null);
+        const run: EditRun = {
+          targetAge: editAge,
+          gender: editGender,
+          attributes: editAttrs,
+          aged: j.aged ?? [],
+          testMatches: j.test_matches ?? [],
+          agedMatches: j.aged_matches ?? {},
+          searchErrors: j.search_errors ?? [],
+        };
+        setEditHistory((prev) => {
+          const next = [...prev, run];
+          setSelectedEditIdx(next.length - 1);
+          return next;
+        });
         break;
       }
 
@@ -268,7 +301,8 @@ export default function HomePage() {
                                 URL.revokeObjectURL(item.previewUrl);
                                 setItems((prev) => prev.filter((_, i) => i !== idx));
                                 setQaResults(null);
-                                setAged(null);
+                                setEditHistory([]);
+                                setSelectedEditIdx(0);
                               }}
                               className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/50 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/70"
                             >
@@ -346,7 +380,8 @@ export default function HomePage() {
                               URL.revokeObjectURL(testPhoto.previewUrl);
                               setTestPhoto(null);
                               setQaResults(null);
-                              setAged(null);
+                              setEditHistory([]);
+                              setSelectedEditIdx(0);
                             }}
                             className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/50 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/70"
                           >
@@ -509,60 +544,108 @@ export default function HomePage() {
                     })}
                   </div>
 
-                  {aged && aged.length > 0 && (
+                  {/* Edit history tabs + Re-Edit button */}
+                  {(editHistory.length > 0 || isRunning) && (
                     <>
                       <div className="mt-6 flex items-center justify-between">
                         <div className="text-sm font-semibold text-slate-900">Aged Outputs</div>
                         <button
                           type="button"
                           onClick={onReEdit}
-                          disabled={isRunning}
+                          disabled={isRunning || !jobId}
                           className="rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
                         >
                           {isRunning ? "Re-editing..." : "Re-Edit"}
                         </button>
                       </div>
-                      <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3">
-                        {aged.map((img, idx) => (
-                          <div key={`${img.filename}-${idx}`} className="overflow-hidden rounded-xl border border-slate-200">
-                            <img
-                              src={b64ToDataUrl(img as any)}
-                              alt={img.filename}
-                              className="h-full w-full object-cover"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
 
-                  {/* AgeDB Matches - Original */}
-                  {testMatches && testMatches.length > 0 && (
-                    <>
-                      <div className="mt-6 text-sm font-semibold text-slate-900">AgeDB Matches - Original</div>
-                      <div className="mt-3 grid grid-cols-5 gap-3">
-                        {testMatches.map((m, idx) => (
-                          <MatchCard key={`test-match-${idx}`} match={m} />
-                        ))}
-                      </div>
-                    </>
-                  )}
+                      {/* Edit run tabs */}
+                      {editHistory.length > 1 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {editHistory.map((run, idx) => {
+                            const label = `Age ${run.targetAge}${run.gender ? ` / ${run.gender}` : ""}${run.attributes ? ` / ${run.attributes}` : ""}`;
+                            const isSelected = idx === selectedEditIdx;
+                            return (
+                              <button
+                                key={`edit-tab-${idx}`}
+                                type="button"
+                                onClick={() => setSelectedEditIdx(idx)}
+                                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                                  isSelected
+                                    ? "bg-blue-600 text-white"
+                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                }`}
+                              >
+                                #{idx + 1}: {label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
 
-                  {/* AgeDB Matches - Aged */}
-                  {agedMatches && Object.keys(agedMatches).length > 0 && (
-                    <>
-                      {Object.entries(agedMatches).map(([fname, matches]) => (
-                        matches && matches.length > 0 && (
-                          <div key={`aged-match-group-${fname}`}>
-                            <div className="mt-6 text-sm font-semibold text-slate-900">AgeDB Matches - {fname}</div>
-                            <div className="mt-3 grid grid-cols-5 gap-3">
-                              {matches.map((m, idx) => (
-                                <MatchCard key={`aged-match-${fname}-${idx}`} match={m} />
-                              ))}
+                      {/* Selected edit params summary */}
+                      {selectedEdit && (
+                        <div className="mt-2 text-xs text-slate-500">
+                          Age {selectedEdit.targetAge}
+                          {selectedEdit.gender ? ` \u00b7 ${selectedEdit.gender}` : ""}
+                          {selectedEdit.attributes ? ` \u00b7 ${selectedEdit.attributes}` : ""}
+                        </div>
+                      )}
+
+                      {/* Aged images for selected run */}
+                      {selectedEdit && selectedEdit.aged.length > 0 && (
+                        <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3">
+                          {selectedEdit.aged.map((img, idx) => (
+                            <div key={`${img.filename}-${idx}`} className="overflow-hidden rounded-xl border border-slate-200">
+                              <img
+                                src={b64ToDataUrl(img as any)}
+                                alt={img.filename}
+                                className="h-full w-full object-cover"
+                              />
                             </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Search errors for selected run */}
+                      {selectedEdit && selectedEdit.searchErrors.length > 0 && (
+                        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+                          <div className="text-sm font-semibold text-red-800">AgeDB search failed</div>
+                          {selectedEdit.searchErrors.map((err, idx) => (
+                            <div key={`search-err-${idx}`} className="mt-1 text-xs text-red-600">{err}</div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* AgeDB Matches - Original for selected run */}
+                      {selectedEdit && selectedEdit.testMatches.length > 0 && (
+                        <>
+                          <div className="mt-6 text-sm font-semibold text-slate-900">AgeDB Matches - Original</div>
+                          <div className="mt-3 grid grid-cols-5 gap-3">
+                            {selectedEdit.testMatches.map((m, idx) => (
+                              <MatchCard key={`test-match-${idx}`} match={m} />
+                            ))}
                           </div>
-                        )
-                      ))}
+                        </>
+                      )}
+
+                      {/* AgeDB Matches - Aged for selected run */}
+                      {selectedEdit && Object.keys(selectedEdit.agedMatches).length > 0 && (
+                        <>
+                          {Object.entries(selectedEdit.agedMatches).map(([fname, matches]) => (
+                            matches && matches.length > 0 && (
+                              <div key={`aged-match-group-${fname}`}>
+                                <div className="mt-6 text-sm font-semibold text-slate-900">AgeDB Matches - {fname}</div>
+                                <div className="mt-3 grid grid-cols-5 gap-3">
+                                  {matches.map((m, idx) => (
+                                    <MatchCard key={`aged-match-${fname}-${idx}`} match={m} />
+                                  ))}
+                                </div>
+                              </div>
+                            )
+                          ))}
+                        </>
+                      )}
                     </>
                   )}
                 </div>

@@ -87,22 +87,31 @@ def _run_selfage_job(job_id: str, self_ref: Path, test_dir: Path, exp_dir: Path,
             JOBS[job_id]["status"] = "searching"
             test_matches = []
             aged_matches = {}
+            search_errors = []
             try:
                 test_imgs = list(test_dir.glob("*.jpg"))
                 if test_imgs:
                     test_bgr = cv2.imread(str(test_imgs[0]))
                     if test_bgr is not None:
                         test_matches = face_search(test_bgr, top_k=5)
-                for fname, abgr in aged_bgrs.items():
-                    aged_matches[fname] = face_search(abgr, top_k=5)
             except Exception as e:
-                print(f"Face search failed (non-fatal): {e}")
+                search_errors.append(f"test search: {e}")
+                print(f"Face search (test) failed: {e}")
+            for fname, abgr in aged_bgrs.items():
+                try:
+                    aged_matches[fname] = face_search(abgr, top_k=5)
+                except Exception as e:
+                    search_errors.append(f"{fname}: {e}")
+                    print(f"Face search ({fname}) failed: {e}")
 
-            JOBS[job_id].update({
+            update = {
                 "status": "done", "aged": aged, "results": results,
                 "test_matches": test_matches, "aged_matches": aged_matches,
                 "_test_dir": str(test_dir), "_exp_dir": str(exp_dir),
-            })
+            }
+            if search_errors:
+                update["search_errors"] = search_errors
+            JOBS[job_id].update(update)
     except Exception as e:
         JOBS[job_id].update({"status": "error", "error": str(e)})
 
@@ -128,18 +137,27 @@ def _run_reedit_job(job_id: str, test_dir: Path, exp_dir: Path, target_age: int,
             JOBS[job_id]["status"] = "searching"
             test_matches = []
             aged_matches = {}
+            search_errors = []
             try:
                 test_imgs = list(test_dir.glob("*.jpg"))
                 if test_imgs:
                     test_bgr = cv2.imread(str(test_imgs[0]))
                     if test_bgr is not None:
                         test_matches = face_search(test_bgr, top_k=5)
-                for fname, abgr in aged_bgrs.items():
-                    aged_matches[fname] = face_search(abgr, top_k=5)
             except Exception as e:
-                print(f"Face search failed (non-fatal): {e}")
+                search_errors.append(f"test search: {e}")
+                print(f"Face search (test) failed: {e}")
+            for fname, abgr in aged_bgrs.items():
+                try:
+                    aged_matches[fname] = face_search(abgr, top_k=5)
+                except Exception as e:
+                    search_errors.append(f"{fname}: {e}")
+                    print(f"Face search ({fname}) failed: {e}")
 
-            JOBS[job_id].update({"status": "done", "aged": aged, "test_matches": test_matches, "aged_matches": aged_matches})
+            update = {"status": "done", "aged": aged, "test_matches": test_matches, "aged_matches": aged_matches}
+            if search_errors:
+                update["search_errors"] = search_errors
+            JOBS[job_id].update(update)
     except Exception as e:
         JOBS[job_id].update({"status": "error", "error": str(e)})
 
